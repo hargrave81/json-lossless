@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/joeshaw/go-simplejson"
+	"github.com/hargrave81/json-lossless/simplejson"
 )
 
 // The JSON type contains the state of the decoded data.  Embed this
@@ -135,7 +135,9 @@ func syncToStruct(dest interface{}, j *simplejson.Json) error {
 		if tag == "-" {
 			continue
 		}
-
+		if strings.Index(tag, ",") > 0 { // this just strips the omit part
+			tag = strings.Split(tag, ",")[0]
+		}
 		tagmap[sf.Name] = sf.Name
 		if tag == "" {
 			tagmap[strings.ToLower(sf.Name)] = sf.Name
@@ -193,8 +195,16 @@ func syncFromStruct(src interface{}, j *simplejson.Json) error {
 	for i := 0; i < dt.NumField(); i++ {
 		sf := dt.Field(i)
 		tag := sf.Tag.Get("json")
+		omitable := false
 		if tag == "-" {
 			continue
+		}
+
+		if strings.Index(tag, ",") > 0 { // this just strips the omit part
+			tag = strings.Split(tag, ",")[0]
+			if strings.Split(tag, ",")[1] == "omitempty" {
+				omitable = true
+			}
 		}
 
 		var name string
@@ -205,7 +215,11 @@ func syncFromStruct(src interface{}, j *simplejson.Json) error {
 		}
 
 		f := dv.Field(i)
-		j.Set(name, f.Interface())
+		if omitable && f.Interface() == nil {
+			j.Set(name, nil)
+		} else {
+			j.Set(name, f.Interface())
+		}
 	}
 
 	return nil
